@@ -1,0 +1,19 @@
+{
+  "name": "@gemini-agent-poc/frontdoor",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Front door broker: validates Auth0 JWTs (the source of trust for user identity), never forwards them past this point, and mints short-lived on-behalf-of (OBO) tokens once a user gives consent.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.1.0"
+  }
+}

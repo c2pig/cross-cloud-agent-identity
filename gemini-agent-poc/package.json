@@ -1,0 +1,29 @@
+{
+  "name": "gemini-agent-poc",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Google Gemini Agent Platform POC: real-estate agent demo with Auth0 login/registration, agent identity, and on-behalf-of user delegation",
+  "workspaces": [
+    "packages/mcp-server",
+    "packages/agent-service",
+    "packages/frontdoor",
+    "packages/frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n mcp,agent,frontdoor,web -c yellow,green,cyan,magenta \"npm:dev:mcp-server\" \"npm:dev:agent-service\" \"npm:dev:frontdoor\" \"npm:dev:frontend\"",
+    "dev:mcp-server": "npm run dev -w packages/mcp-server",
+    "dev:agent-service": "npm run dev -w packages/agent-service",
+    "dev:frontdoor": "npm run dev -w packages/frontdoor",
+    "dev:frontend": "npm run dev -w packages/frontend",
+    "build": "npm run build -w packages/frontend",
+    "smoke-test": "node scripts/smoke-test.mjs",
+    "deploy": "bash scripts/deploy.sh"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

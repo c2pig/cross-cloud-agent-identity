@@ -1,0 +1,13 @@
+{
+  "_comment": "Mock Agent Registry. In real GCP this maps to the Agent Registry entries an Agent Gateway (egress mode) consults before allowing traffic to reach this MCP endpoint at all -- an agent id or tool not listed here is denied by default, independent of whether its token is valid.",
+  "mcpEndpoint": "http://localhost:8082/mcp",
+  "agents": [
+    {
+      "id": "agents/real-estate-agent-v1",
+      "displayName": "Real Estate Concierge Agent",
+      "status": "active",
+      "allowedTools": ["search_property", "get_preference", "update_preference"],
+      "allowedScopes": ["preference:write"]
+    }
+  ]
+}

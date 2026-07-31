@@ -1,0 +1,19 @@
+{
+  "name": "@gemini-agent-poc/agent-service",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Agent runtime: stands in for a Vertex AI Agent Engine deployment. Owns its own agent identity, calls the mock MCP server for reads, and defers writes to a user-consent (OBO) flow.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
