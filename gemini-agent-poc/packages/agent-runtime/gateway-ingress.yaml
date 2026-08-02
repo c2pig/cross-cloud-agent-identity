@@ -1,0 +1,5 @@
+name: real-estate-agent-gateway-ingress
+protocols:
+  - MCP
+googleManaged:
+  governedAccessPath: CLIENT_TO_AGENT

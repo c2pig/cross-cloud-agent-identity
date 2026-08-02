@@ -1,0 +1,7 @@
+name: real-estate-agent-gateway-egress
+protocols:
+  - MCP
+googleManaged:
+  governedAccessPath: AGENT_TO_ANYWHERE
+registries:
+  - //agentregistry.googleapis.com/projects/fresh-eyes-501103/locations/us-central1

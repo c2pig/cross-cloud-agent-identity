@@ -137,7 +137,14 @@ app.post("/api/consent/:consentId/:decision", requireUser, async (req, res) => {
         "Content-Type": "application/json",
         "X-Frontdoor-Key": FRONTDOOR_TO_AGENT_KEY,
       },
-      body: JSON.stringify({ consentId, approved, oboToken, correlationId }),
+      body: JSON.stringify({
+        consentId,
+        approved,
+        oboToken,
+        correlationId,
+        userId: pending.userId,
+        sessionId: pending.sessionId,
+      }),
     });
     const body = await resp.json();
     if (!resp.ok) throw new Error(body.error || `agent-service returned ${resp.status}`);

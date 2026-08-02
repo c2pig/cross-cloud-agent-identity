@@ -1,0 +1,6 @@
+google-cloud-aiplatform[adk,agent_engines]
+httpx
+cloudpickle
+pydantic
+fastapi
+uvicorn[standard]
