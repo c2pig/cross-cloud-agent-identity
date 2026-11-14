@@ -1,22 +1,3 @@
-terraform {
-  required_version = ">= 1.5.0"
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 6.0"
-    }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.6"
-    }
-  }
-}
-
-provider "google" {
-  project = var.project_id
-  region  = var.region
-}
-
 resource "google_project_service" "apis" {
   for_each = toset([
     "run.googleapis.com",
@@ -26,6 +7,13 @@ resource "google_project_service" "apis" {
     "aiplatform.googleapis.com",
     "logging.googleapis.com",
     "cloudtrace.googleapis.com",
+    "storage.googleapis.com",
+    "networkservices.googleapis.com",
+    "networksecurity.googleapis.com",
+    "iap.googleapis.com",
+    "agentregistry.googleapis.com",
+    "modelarmor.googleapis.com",
+    "cloudresourcemanager.googleapis.com",
   ])
   service            = each.key
   disable_on_destroy = false

@@ -1,0 +1,6 @@
+project_id          = "fresh-eyes-501103"
+region              = "us-central1"
+auth0_domain        = "dev-w1l51ci6zjjdb3de.us.auth0.com"
+auth0_audience      = "https://gemini-agent-poc/api"
+reasoning_engine_id = "2124909025014317056"
+image_tag           = "latest"

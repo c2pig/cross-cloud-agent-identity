@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars (gitignored). Domain and audience come from
+# managed-infrastructure stacks/global/auth0/platform outputs. Do not
+# invent a second tenant.
+auth0_domain            = "dev-w1l51ci6zjjdb3de.us.auth0.com"
+auth0_audience          = "https://gemini-agent-poc/api"
+terraform_client_id     = "replace-with-m2m-client-id"
+terraform_client_secret = "replace-with-m2m-client-secret"

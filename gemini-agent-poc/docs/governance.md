@@ -41,14 +41,11 @@ attempts/failures, requests/sec) — see `docs/gcp-mapping.md` §4.
 `OBO_SIGNING_SECRET`, `AGENT_IDENTITY_SIGNING_SECRET`, and
 `FRONTDOOR_TO_AGENT_KEY` are shared, static secrets for local dev (root
 `.env`) and Terraform-generated random values for Cloud Run
-(`infra/secrets.tf`). To rotate in the deployed environment:
+(`infra/gcp-foundation/secrets.tf`). To rotate in the deployed environment:
 
 ```bash
-cd infra
-terraform apply -replace=random_password.obo_signing_secret \
-  -var="project_id=$GCP_PROJECT_ID" -var="auth0_domain=$AUTH0_DOMAIN" \
-  -var="auth0_audience=$AUTH0_AUDIENCE" -var="gemini_api_key=$GEMINI_API_KEY" \
-  -var="image_tag=$IMAGE_TAG"
+terraform -chdir=infra/gcp-foundation apply -replace=random_password.obo_signing_secret \
+  -var="project_id=$GCP_PROJECT_ID"
 ```
 
 This creates a new Secret Manager version and Cloud Run picks it up on the
@@ -65,6 +62,6 @@ rotations of `AGENT_IDENTITY_SIGNING_SECRET` around a deploy, not mid-day.
 - [ ] Secrets rotated on a schedule, not just on suspicion of compromise
 - [ ] Consent decisions (not just resulting tool calls) durably logged
 - [ ] Rate limiting in front of `mcp-server`, independent of the registry check
-- [ ] Decide on `enforce_cloud_run_iam_invoker` (see `infra/variables.tf`) and
+- [ ] Decide on `enforce_cloud_run_iam_invoker` (see `infra/gcp-runtime`) and
       do the header-scheme rework it requires, if you want real GCP-level
       ingress enforcement rather than just the app-level checks this POC ships
