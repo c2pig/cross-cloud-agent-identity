@@ -1,41 +1,23 @@
-locals {
-  repo_prefix = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.images.repository_id}"
-}
-
 resource "google_cloud_run_v2_service" "mcp_server" {
   name     = "gemini-poc-mcp-server"
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
-    service_account = google_service_account.mcp_server.email
+    service_account = local.mcp_sa
     containers {
       image = "${local.repo_prefix}/mcp-server:${var.image_tag}"
-      env {
-        name  = "AGENT_REGISTRY_PATH"
-        value = "/app/registry/agents.json"
-      }
-      env {
-        name = "AGENT_IDENTITY_SIGNING_SECRET"
-        value_source {
-          secret_key_ref {
-            secret  = google_secret_manager_secret.agent_identity_signing_secret.secret_id
-            version = "latest"
-          }
-        }
-      }
       env {
         name = "OBO_SIGNING_SECRET"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.obo_signing_secret.secret_id
+            secret  = local.obo_secret_id
             version = "latest"
           }
         }
       }
     }
   }
-  depends_on = [google_project_service.apis]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "mcp_server_invoker" {
@@ -43,7 +25,7 @@ resource "google_cloud_run_v2_service_iam_member" "mcp_server_invoker" {
   name     = google_cloud_run_v2_service.mcp_server.name
   location = var.region
   role     = "roles/run.invoker"
-  member   = "serviceAccount:${google_service_account.agent_service.email}"
+  member   = "serviceAccount:${local.agent_sa}"
 }
 
 resource "google_cloud_run_v2_service_iam_member" "mcp_server_public" {
@@ -54,73 +36,51 @@ resource "google_cloud_run_v2_service_iam_member" "mcp_server_public" {
   member   = "allUsers"
 }
 
-resource "google_cloud_run_v2_service" "agent_service" {
-  name     = "gemini-poc-agent-service"
+resource "google_cloud_run_v2_service" "bridge" {
+  name     = "gemini-poc-agent-bridge"
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
-    service_account = google_service_account.agent_service.email
+    service_account = local.agent_sa
     containers {
-      image = "${local.repo_prefix}/agent-service:${var.image_tag}"
+      image = "${local.repo_prefix}/agent-bridge:${var.image_tag}"
       env {
-        name  = "MCP_SERVER_URL"
-        value = google_cloud_run_v2_service.mcp_server.uri
+        name  = "GCP_PROJECT_ID"
+        value = var.project_id
       }
       env {
-        name  = "AGENT_IDENTITY_ID"
-        value = "agents/real-estate-agent-v1"
+        name  = "GCP_LOCATION"
+        value = var.region
       }
       env {
-        name  = "GEMINI_MODEL"
-        value = "gemini-2.0-flash"
-      }
-      dynamic "env" {
-        for_each = var.gemini_api_key != "" ? [1] : []
-        content {
-          name = "GEMINI_API_KEY"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.gemini_api_key[0].secret_id
-              version = "latest"
-            }
-          }
-        }
-      }
-      env {
-        name = "AGENT_IDENTITY_SIGNING_SECRET"
-        value_source {
-          secret_key_ref {
-            secret  = google_secret_manager_secret.agent_identity_signing_secret.secret_id
-            version = "latest"
-          }
-        }
+        name  = "REASONING_ENGINE_ID"
+        value = var.reasoning_engine_id
       }
       env {
         name = "FRONTDOOR_TO_AGENT_KEY"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.frontdoor_to_agent_key.secret_id
+            secret  = local.frontdoor_key_secret
             version = "latest"
           }
         }
       }
     }
   }
-  depends_on = [google_project_service.apis]
 }
 
-resource "google_cloud_run_v2_service_iam_member" "agent_service_invoker" {
+resource "google_cloud_run_v2_service_iam_member" "bridge_invoker" {
   count    = var.enforce_cloud_run_iam_invoker ? 1 : 0
-  name     = google_cloud_run_v2_service.agent_service.name
+  name     = google_cloud_run_v2_service.bridge.name
   location = var.region
   role     = "roles/run.invoker"
-  member   = "serviceAccount:${google_service_account.frontdoor.email}"
+  member   = "serviceAccount:${local.frontdoor_sa}"
 }
 
-resource "google_cloud_run_v2_service_iam_member" "agent_service_public" {
+resource "google_cloud_run_v2_service_iam_member" "bridge_public" {
   count    = var.enforce_cloud_run_iam_invoker ? 0 : 1
-  name     = google_cloud_run_v2_service.agent_service.name
+  name     = google_cloud_run_v2_service.bridge.name
   location = var.region
   role     = "roles/run.invoker"
   member   = "allUsers"
@@ -132,7 +92,7 @@ resource "google_cloud_run_v2_service" "frontdoor" {
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
-    service_account = google_service_account.frontdoor.email
+    service_account = local.frontdoor_sa
     containers {
       image = "${local.repo_prefix}/frontdoor:${var.image_tag}"
       env {
@@ -144,8 +104,12 @@ resource "google_cloud_run_v2_service" "frontdoor" {
         value = var.auth0_audience
       }
       env {
+        name  = "ALLOW_MOCK_AUTH"
+        value = "false"
+      }
+      env {
         name  = "AGENT_SERVICE_URL"
-        value = google_cloud_run_v2_service.agent_service.uri
+        value = google_cloud_run_v2_service.bridge.uri
       }
       env {
         name  = "AGENT_IDENTITY_ID"
@@ -155,7 +119,7 @@ resource "google_cloud_run_v2_service" "frontdoor" {
         name = "OBO_SIGNING_SECRET"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.obo_signing_secret.secret_id
+            secret  = local.obo_secret_id
             version = "latest"
           }
         }
@@ -164,14 +128,13 @@ resource "google_cloud_run_v2_service" "frontdoor" {
         name = "FRONTDOOR_TO_AGENT_KEY"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.frontdoor_to_agent_key.secret_id
+            secret  = local.frontdoor_key_secret
             version = "latest"
           }
         }
       }
     }
   }
-  depends_on = [google_project_service.apis]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "frontdoor_public" {
@@ -182,10 +145,8 @@ resource "google_cloud_run_v2_service_iam_member" "frontdoor_public" {
   member   = "allUsers"
 }
 
-# The frontend image must be built *after* frontdoor exists (its URL is
-# baked in at build time via VITE_FRONTDOOR_URL -- see infra/README.md for
-# the two-phase apply this implies). image_tag for this service is expected
-# to be supplied on the second apply once that build has happened.
+# The frontend image must be built after frontdoor exists. VITE_FRONTDOOR_URL
+# and VITE_AUTH0_CLIENT_ID are baked in at image build time (see scripts/deploy.sh).
 resource "google_cloud_run_v2_service" "frontend" {
   name     = "gemini-poc-frontend"
   location = var.region
@@ -196,7 +157,8 @@ resource "google_cloud_run_v2_service" "frontend" {
       image = "${local.repo_prefix}/frontend:${var.image_tag}"
     }
   }
-  depends_on = [google_project_service.apis, google_cloud_run_v2_service.frontdoor]
+
+  depends_on = [google_cloud_run_v2_service.frontdoor]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "frontend_public" {

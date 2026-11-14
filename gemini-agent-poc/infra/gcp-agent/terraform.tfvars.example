@@ -1,0 +1,4 @@
+project_id      = "fresh-eyes-501103"
+region          = "us-central1"
+bucket_location = "US"
+mcp_server_url  = "https://gemini-poc-mcp-server-67873858780.us-central1.run.app"

@@ -1,83 +1,46 @@
-# Infrastructure as Code (Terraform)
+# Infrastructure as Code
 
-Provisions: Artifact Registry, three per-service accounts (least-privilege secret
-access), Secret Manager secrets for the POC's signing keys, and four Cloud Run
-services (mcp-server, agent-service, frontdoor, frontend).
+Four stacks, one local state each. Nothing here redefines the Auth0 tenant. Domain, issuer, JWKS, and the default API audience are published by **managed-infrastructure** `stacks/global/auth0/platform`. Copy those outputs into the variables below. Platform state is local, so these stacks do not use `terraform_remote_state`.
 
-This is illustrative IaC for a POC, not a hardened production module. It has
-not been applied against a real GCP project as part of building this repo —
-review it before running `terraform apply` against anything you care about.
-
-## Two-phase apply (frontend build-time env problem)
-
-The frontend is a Vite SPA: `VITE_FRONTDOOR_URL` gets baked into the static
-bundle at **build time**, but the front door's Cloud Run URL only exists
-*after* Terraform creates it. So bringing this up from scratch is two passes:
-
-```bash
-# Phase 1 — create everything except the frontend needs a real image first;
-# build & push mcp-server / agent-service / frontdoor, then create them:
-terraform apply \
-  -var="project_id=$GCP_PROJECT_ID" \
-  -var="auth0_domain=$AUTH0_DOMAIN" \
-  -var="auth0_audience=$AUTH0_AUDIENCE" \
-  -var="gemini_api_key=$GEMINI_API_KEY" \
-  -var="image_tag=$IMAGE_TAG" \
-  -target=google_cloud_run_v2_service.mcp_server \
-  -target=google_cloud_run_v2_service.agent_service \
-  -target=google_cloud_run_v2_service.frontdoor
-
-FRONTDOOR_URL=$(terraform output -raw frontdoor_url)
-
-# Phase 2 — now build the frontend image with that URL baked in, and apply
-# everything (including the frontend service) in full:
-gcloud builds submit ../packages/frontend \
-  --tag "$(terraform output -raw artifact_registry_repo)/frontend:${IMAGE_TAG}" \
-  --substitutions=_VITE_FRONTDOOR_URL="${FRONTDOOR_URL}"
-
-terraform apply \
-  -var="project_id=$GCP_PROJECT_ID" \
-  -var="auth0_domain=$AUTH0_DOMAIN" \
-  -var="auth0_audience=$AUTH0_AUDIENCE" \
-  -var="gemini_api_key=$GEMINI_API_KEY" \
-  -var="image_tag=$IMAGE_TAG"
+```text
+infra/
+├── auth0/            # SPA, API, client grant
+├── gcp-foundation/   # APIs, Artifact Registry, service accounts, secrets
+├── gcp-runtime/      # Cloud Run: mcp-server, bridge, frontdoor, frontend
+└── gcp-agent/        # staging bucket and Vertex IAM for the bridge
 ```
 
-`scripts/deploy.sh` at the repo root scripts exactly this sequence.
-
-## What's deliberately not modeled in Terraform here
-
-Vertex AI Agent Engine deployments, the Agent Registry, and Agent Gateway
-(ingress/egress) resources either have no stable Terraform provider support
-today, or are still moving targets in the underlying API. Rather than fake
-resources that would silently drift from whatever the real console/CLI
-surface looks like when you read this, those steps are left as documented
-`gcloud` commands to run by hand once you're ready to move this POC's
-agent-service off a plain Cloud Run container and onto real Agent Engine:
-
-```bash
-# Illustrative -- check current syntax before running; this surface moves.
-gcloud ai reasoning-engines create \
-  --project=$GCP_PROJECT_ID --region=$GCP_LOCATION \
-  --display-name=real-estate-agent-v1 \
-  --package-uris=... --python-module=agent.main
-
-gcloud network-services agent-gateways import ... # or current console equivalent
+```mermaid
+flowchart LR
+  platform["managed-infrastructure auth0/platform"]
+  auth0["infra/auth0"]
+  foundation["infra/gcp-foundation"]
+  runtime["infra/gcp-runtime"]
+  agent["infra/gcp-agent"]
+  platform -->|"domain and audience"| auth0
+  platform -->|"domain and audience"| runtime
+  auth0 -->|"spa_client_id"| runtime
+  foundation --> runtime
+  foundation --> agent
+  runtime -->|"mcp URL"| agent
 ```
 
-See `docs/gcp-mapping.md` for how each piece of this POC maps to those real
-primitives, and `docs/governance.md` for the operational controls (registry,
-audit logging, secret scoping, rate limiting) this POC stands in for using
-plain Node code instead of GCP-native services.
+## Apply order
 
-## Variables
+1. `infra/auth0` — adopt the existing SPA and API. Skip only if you already have the SPA client ID and do not want Terraform to manage Auth0 yet.
+2. `infra/gcp-foundation`
+3. `infra/gcp-agent` — bucket and `roles/aiplatform.expressUser`. Does not create the reasoning engine or attach gateways.
+4. `infra/gcp-runtime` — two-phase, because the frontend image needs the frontdoor URL. `scripts/deploy.sh` runs this sequence and builds the images.
 
-| Variable | Purpose |
+`scripts/deploy.sh` applies the agent stack before Cloud Run so the bridge's Vertex role exists, then sets `mcp_server_url` on that stack after the MCP service has a URL.
+
+## Not owned here
+
+| Object | Owner |
 |---|---|
-| `project_id` | GCP project to deploy into |
-| `region` | Cloud Run / Artifact Registry region |
-| `image_tag` | Tag applied to all four images (e.g. a git SHA) |
-| `auth0_domain` / `auth0_audience` | Passed straight through to frontdoor's JWT validation |
-| `gemini_api_key` | Optional; omit to run agent-service in mock-planner mode |
-| `allow_unauthenticated_frontdoor` | Default `true` — the Auth0 check inside the app is the real gate |
-| `enforce_cloud_run_iam_invoker` | Default `false` — see the warning in `variables.tf` before flipping this on |
+| Auth0 tenant, issuer, JWKS | managed-infrastructure `stacks/global/auth0/platform` |
+| Auth0 users, Default App, ROPG spike client | Not managed |
+| Reasoning engine and Agent Gateways | `packages/agent-runtime/deploy.py` and the gateway YAML files, until the Google provider has resources for them |
+| Gateways attached to the engine | Left unattached. Egress attachment crashes the managed runtime. |
+
+No secrets, `terraform.tfvars`, or state files belong in Git.

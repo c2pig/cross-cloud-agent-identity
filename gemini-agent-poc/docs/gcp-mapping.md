@@ -51,7 +51,7 @@ component that ever sees both worlds.
 | `mcp-server` checks the registry *before* even validating the OBO token | **Agent Gateway (egress mode)** enforces default-deny at the platform layer, as a gate in front of, not instead of, the destination's own trust model (IAM/OAuth/mTLS) — see the ADR in `poc/docs/adr-cross-cloud-agent-identity.md` in this repo's other POC for the fuller version of this argument |
 | `agent-service` only accepts calls carrying `X-Frontdoor-Key` | **Agent Gateway (ingress mode)** allow-lists which caller identity may invoke the agent at all, rather than relying on possession of a role like `aiplatform.user` |
 | `packages/mcp-server/src/audit.js`: in-memory log of every tool call, decision, and (when applicable) which user was being acted for | **Cloud Trace / Cloud Logging** plus the Agent Gateway **Observability tab** (authorization attempts/failures, RPS) give you this for real, and it's what you'd actually alert on |
-| Per-service Google Cloud service accounts with least-privilege Secret Manager access (`infra/secrets.tf`) | Same IAM principle, just for real: narrowly scoped, independently revocable credentials per hop |
+| Per-service Google Cloud service accounts with least-privilege Secret Manager access (`infra/gcp-foundation/secrets.tf`) | Same IAM principle, just for real: narrowly scoped, independently revocable credentials per hop |
 
 ### Other governance angles worth adding as you move past this POC
 
@@ -71,6 +71,6 @@ component that ever sees both worlds.
   real Google-issued tokens rotate automatically by virtue of being
   short-lived and platform-managed.
 - **Cloud Run IAM invoker enforcement**: see the `enforce_cloud_run_iam_invoker`
-  variable in `infra/variables.tf` — turned off by default because it
+  variable in `infra/gcp-runtime` — turned off by default because it
   requires moving the app's custom tokens off the `Authorization` header
   first (see that variable's description for the exact collision).

@@ -37,7 +37,7 @@ gemini-agent-poc/
 │   ├── frontdoor/                # validates Auth0 JWT, mints OBO tokens on consent
 │   ├── agent-service/            # agent runtime (Gemini function-calling or mock planner)
 │   └── mcp-server/                # mock MCP tools + agent registry + audit log
-├── infra/                         # Terraform: Cloud Run x4, Secret Manager, IAM
+├── infra/                         # Terraform stacks: auth0, gcp-foundation, gcp-runtime, gcp-agent
 ├── scripts/
 │   ├── deploy.sh                  # two-phase Cloud Run deploy (see infra/README.md)
 │   └── smoke-test.mjs             # one-shot local backend test, no credentials needed
@@ -84,10 +84,10 @@ npm run deploy   # runs scripts/deploy.sh
 ```
 
 Requires `gcloud` authenticated against a real GCP project and `terraform`
-installed. See `infra/README.md` for the two-phase apply this requires
-(the frontend's Auth0/frontdoor config is baked in at build time) and for
-what's deliberately left as manual `gcloud` steps (Agent Engine, Agent
-Registry, Agent Gateway) rather than modeled in Terraform.
+installed. See `infra/README.md` for the four stacks. Auth0 domain and
+audience come from managed-infrastructure. The reasoning engine and Agent
+Gateways are still created outside Terraform; the Google provider has no
+resource for them, and the gateways stay unattached.
 
 ## Known simplifications (intentional, called out in docs/gcp-mapping.md)
 
@@ -98,7 +98,7 @@ Registry, Agent Gateway) rather than modeled in Terraform.
   Agent Engine deployment (Node isn't a supported Agent Engine runtime today
   — see `docs/gcp-mapping.md` §1 for the real mechanism this stands in for).
 - Cloud Run IAM invoker enforcement between services is off by default
-  (`infra/variables.tf`'s `enforce_cloud_run_iam_invoker`) because it
+  (`infra/gcp-runtime` `enforce_cloud_run_iam_invoker`) because it
   requires moving this POC's custom tokens off the `Authorization` header
   first — see that variable's description.
 - No real database anywhere — `mcp-server` holds everything in memory.
